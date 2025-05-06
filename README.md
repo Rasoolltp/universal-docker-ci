@@ -1,14 +1,28 @@
-# Universal Docker CI Pipeline
+# 🌐 Universal GitLab CI/CD Pipeline for Docker Projects
 
-This repository contains a universal GitLab CI pipeline configuration (`.gitlab-ci.yml`) that works with any project that includes a `Dockerfile`. The pipeline will automatically build and push Docker images to GitLab's container registry.
+This repository provides a plug-and-play `.gitlab-ci.yml` file that you can add to **any project with a Dockerfile** to fully automate the CI/CD process — from build to deploy.
 
-## Usage
+---
 
-To use this CI pipeline in your GitLab project, follow these steps:
+## 🚀 Features
 
-1. **Create a new GitLab project** or use an existing one.
-2. **Add your Dockerfile** to the project.
-3. **Add the `.gitlab-ci.yml` file** from this repository to your GitLab project by including it via remote:
+- ✅ Auto-detects if a `Dockerfile` exists
+- 🔧 Runs language-specific build steps (Laravel, Go, .NET, etc.)
+- 🐳 Builds Docker image
+- 📤 Pushes image to GitLab Container Registry
+- 📦 Deploys to your target server over SSH
+
+---
+
+## 📁 How to Use
+
+### 1. Add `.gitlab-ci.yml` to your project's root
+
+Copy the `gitlab-ci.yml` from this repo into your project.
+
+```bash
+curl -O https://raw.githubusercontent.com/<your-username>/universal-docker-ci/main/gitlab-ci.yml
+
 
 ```yaml
 include:
