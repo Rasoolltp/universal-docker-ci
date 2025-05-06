@@ -1,32 +1,43 @@
 stages:
   - check
   - build
+  - dockerize
   - push
+  - deploy
 
 variables:
   DOCKER_IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
   DOCKER_DRIVER: overlay2
   DOCKER_BUILDKIT: 1
+  DOCKER_TLS_CERTDIR: "/certs"
 
-#services:
- # - docker:dind
+services:
+  - docker:dind
 
 check_dockerfile:
   stage: check
   script:
-    - |
-      if [ ! -f Dockerfile ]; then
-        echo "❌ No Dockerfile found. Skipping pipeline."
-        exit 0
-      fi
-      echo "✅ Dockerfile found. Proceeding..."
+    - if [ ! -f Dockerfile ]; then echo "❌ No Dockerfile found. Skipping pipeline."; exit 0; fi
+    - echo "✅ Dockerfile found. Proceeding..."
+  rules:
+    - exists:
+        - Dockerfile
+
+build_project:
+  stage: build
+  script:
+    - echo "Running build steps inside containerized environment..."
+    - if [ -f package.json ]; then npm install && npm run build; fi
+    - if [ -f composer.json ]; then composer install --no-interaction --prefer-dist --optimize-autoloader; fi
+    - if [ -f go.mod ]; then go build -o app; fi
+    - if ls *.csproj 1> /dev/null 2>&1; then dotnet publish -c Release -o out; fi
   rules:
     - exists:
         - Dockerfile
 
 docker_build:
-  stage: build
-  needs: [check_dockerfile]
+  stage: dockerize
+  needs: [build_project]
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build -t "$DOCKER_IMAGE" .
@@ -45,3 +56,24 @@ docker_push:
     - exists:
         - Dockerfile
 
+deploy_to_server:
+  stage: deploy
+  needs: [docker_push]
+  script:
+    - echo "Deploying to production server..."
+    - apk add --no-cache openssh
+    - chmod 600 deploy_key
+    - eval $(ssh-agent -s)
+    - ssh-add deploy_key
+    - ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "
+        docker pull $DOCKER_IMAGE &&
+        docker stop my_app || true &&
+        docker rm my_app || true &&
+        docker run -d --name my_app -p 80:80 $DOCKER_IMAGE
+      "
+  rules:
+    - exists:
+        - Dockerfile
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  only:
+    - main
