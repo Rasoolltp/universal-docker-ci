@@ -1,0 +1,47 @@
+stages:
+  - check
+  - build
+  - push
+
+variables:
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
+  DOCKER_DRIVER: overlay2
+  DOCKER_BUILDKIT: 1
+
+#services:
+ # - docker:dind
+
+check_dockerfile:
+  stage: check
+  script:
+    - |
+      if [ ! -f Dockerfile ]; then
+        echo "❌ No Dockerfile found. Skipping pipeline."
+        exit 0
+      fi
+      echo "✅ Dockerfile found. Proceeding..."
+  rules:
+    - exists:
+        - Dockerfile
+
+docker_build:
+  stage: build
+  needs: [check_dockerfile]
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t "$DOCKER_IMAGE" .
+  rules:
+    - exists:
+        - Dockerfile
+
+docker_push:
+  stage: push
+  needs: [docker_build]
+  script:
+    - docker push "$DOCKER_IMAGE"
+    - docker tag "$DOCKER_IMAGE" "$CI_REGISTRY_IMAGE:latest"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+  rules:
+    - exists:
+        - Dockerfile
+
